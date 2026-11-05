@@ -37,19 +37,19 @@ The screenshots below show the Windows GUI with the three main result views. The
 
 ### Extraction Log
 
-![Extraction Log tab of the Windows firmware extractor](docs/screenshots/extraction-log.png)
+![Extraction Log tab of the Windows firmware extractor](extraction-log.png)
 
 Displays extraction messages, supported external tool names and processing diagnostics.
 
 ### File Results
 
-![File Results tab with export and SHA-256 controls](docs/screenshots/file-results.png)
+![File Results tab with export and SHA-256 controls](file-results.png)
 
 Provides the results table, including filename, file type, architecture, size, status and SHA-256, with CSV/JSON export controls.
 
 ### Key Audit
 
-![Key Audit tab showing key selection reporting controls](docs/screenshots/key-audit.png)
+![Key Audit tab showing key selection reporting controls](key-audit.png)
 
 Shows requested and selected keysets, operations and results when an audit report is available.
 
