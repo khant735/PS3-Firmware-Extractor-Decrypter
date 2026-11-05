@@ -1,0 +1,18 @@
+# Never publish firmware, decrypted binaries or cryptographic key material
+PS3/data/
+keysets.csv
+**/keys
+**/internal_keys
+*.pup
+*.PUP
+*.self
+*.sprx
+*.elf
+*.pkg
+*.spkg
+*.exe
+*.dll
+output/
+__pycache__/
+*.pyc
+.venv/
