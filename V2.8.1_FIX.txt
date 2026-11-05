@@ -1,0 +1,4 @@
+v2.8.1 hotfix
+Fixes CSV report crash: dict contains fields not in fieldnames: tar_extraction.
+CSV columns now include every field occurring in any batch row, including tar_extraction and tar_extraction_error.
+No decryption or TAR extraction logic changed.

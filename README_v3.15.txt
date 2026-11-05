@@ -1,0 +1,1 @@
+v3.15: Single-pass read-only firmware format, MSELF and FSELF inventories. Stronger ELF program-table and SCE bounds validation; MIPS identified as MIPS. Legacy standalone scanners remain available. Signature hits remain candidates; no embedded extraction or decryption. Existing embedded executable audit remains separate.

@@ -1,0 +1,9 @@
+PS3 SPKG Extractor GUI v3.1 - empty SELF and TAR integrity diagnostics
+
+- Before invoking unself, checks for 0-byte SELF and records empty source/skipped, rather than a backend failure.
+- Nested SELF pass includes zero-byte .self files for explicit reporting.
+- Full/TAR batch modes compare every extracted dev_flash regular file with its decrypted TAR member by length and SHA256.
+- New firmware_tar_integrity.json/.csv distinguish empty in original TAR, match, mismatch, missing, and empty after extraction (CORRUPT).
+- Does not overwrite the firmware originals or infer that empty files are normal.
+- A standalone audit_existing_extraction.py is included to audit previous v3.0 output without rerunning decryption.
+- Requires existing external tools/keys for normal decryption operations.

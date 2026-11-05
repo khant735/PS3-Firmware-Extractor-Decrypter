@@ -1,0 +1,1 @@
+v2.5: Fixes PUP unpack failure when pupunpack.exe tries to mkdir an already-created output directory. The backend now extracts to a fresh sibling staging directory, and the GUI moves results into output/<PUP name>. Also recognizes SCEUF PUP magic. Windows runtime testing required.

@@ -1,0 +1,8 @@
+Version 2.9
+- Batch firmware decrypt + TAR extract now generates firmware_file_inventory.json and .csv.
+- Recursively catalogs dev_flash and dev_flash3 with original paths, extension, header signature, byte size, and SHA-256.
+- Existing nested SELF checkbox now optionally processes SCE-wrapped SELF and SPRX files from the extracted firmware tree.
+- Originals remain untouched; ELF output is written under ELF/dev_flash_extracted/.
+- A file extension alone does not prove encryption or content type.
+- Package key audit events remain in the extraction log; aggregation into successful_keys.json is not yet implemented for batch PKG operations.
+- Test with a new empty output folder. Windows full firmware test is pending.

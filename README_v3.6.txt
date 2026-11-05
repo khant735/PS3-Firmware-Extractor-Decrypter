@@ -1,0 +1,1 @@
+v3.6: Fix Auto final audit false failure on verified source-empty dev_flash TAR members. Empty files are accepted only when firmware_tar_integrity.json records zero-byte source and destination with matching SHA256. Unverified empty files, malformed paths and unreadable files still fail. No decryption/extraction logic changed.
