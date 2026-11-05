@@ -31,6 +31,28 @@ Or `py -3 ps3_spkg_extractor_gui.py`. The launcher starts the Python GUI directl
 4. Review the operation log and generated JSON reports. Converted executables are written under the output `ELF/` tree while preserving relative paths.
 5. Use the FSELF, MSELF and general-format inventory options for **read-only** discovery. A detected signature is not proof that an embedded object is independently executable.
 
+## Screenshots
+
+The screenshots below show the Windows GUI with the three main result views. The application window currently identifies itself as **PS3 Firmware SPKG / PUP / SELF Extractor v3.8**, even though this repository's packaged release is labelled v3.15.
+
+### Extraction Log
+
+![Extraction Log tab of the Windows firmware extractor](docs/screenshots/extraction-log.png)
+
+Displays extraction messages, supported external tool names and processing diagnostics.
+
+### File Results
+
+![File Results tab with export and SHA-256 controls](docs/screenshots/file-results.png)
+
+Provides the results table, including filename, file type, architecture, size, status and SHA-256, with CSV/JSON export controls.
+
+### Key Audit
+
+![Key Audit tab showing key selection reporting controls](docs/screenshots/key-audit.png)
+
+Shows requested and selected keysets, operations and results when an audit report is available.
+
 ## Windows batch files (`.bat`)
 
 The repository contains **eight Windows batch launchers**. They are convenience wrappers for the Python scripts; they do not compile the application. All require a working Python 3 launcher (`py -3`) on Windows. Run them from an extracted/cloned source checkout, rather than opening them inside a ZIP. The launcher names below match the files in the repository.
