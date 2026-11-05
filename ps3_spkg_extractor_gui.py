@@ -1126,8 +1126,8 @@ class App:
         finally:self.events.put("__DONE__")
 if __name__=="__main__":
     if "--firmware-v34" in sys.argv:
-        from firmware_v34 import main as firmware_v34_main
-        firmware_v34_main()
+        from firmware_v34 import gui as firmware_v34_gui
+        firmware_v34_gui()
         sys.exit(0)
     root=tk.Tk()
     try:root.tk.call("tk","scaling",1.1)
