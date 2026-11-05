@@ -1,0 +1,54 @@
+name: Build Windows release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      - name: Verify Python sources
+        shell: pwsh
+        run: |
+          python -m compileall -q -f .
+          python -c "import tkinter; import firmware_format_scan, firmware_fself_scan, firmware_mself_scan, embedded_container_audit, spkg_overlay_audit; print('Python imports OK')"
+      - name: Build standalone Windows executable
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pyinstaller
+          python -m PyInstaller --noconfirm --clean --onedir --windowed --name PS3-Firmware-Extractor-Decrypter --collect-submodules tkinter --hidden-import firmware_v34 --hidden-import firmware_format_scan --hidden-import firmware_fself_scan --hidden-import firmware_mself_scan --hidden-import embedded_container_audit --hidden-import spkg_overlay_audit --hidden-import audit_existing_extraction ps3_spkg_extractor_gui.py
+      - name: Prepare distribution
+        shell: pwsh
+        run: |
+          $dest = "release/PS3-Firmware-Extractor-Decrypter-v3.15-Windows-x64"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Copy-Item "dist/PS3-Firmware-Extractor-Decrypter/*" $dest -Recurse
+          Copy-Item README.md,VERSION.txt $dest
+          New-Item -ItemType Directory -Force "$dest/tools","$dest/ps3keys" | Out-Null
+          Set-Content -Path "$dest/tools/PLACE_BACKEND_TOOLS_HERE.txt" -Value "Add compatible pupunpack.exe, unpkg.exe, cosunpkg.exe, unself.exe etc. Not included."
+          Set-Content -Path "$dest/ps3keys/PLACE_AUTHORIZED_KEYS_HERE.txt" -Value "Place authorized package keys named pkg-key-* here. Not included."
+          Set-Content -Path "$dest/KEYSET_SETUP.txt" -Value "Supply your own keysets.csv for SELF decryption. See README.md."
+          Compress-Archive -Path $dest -DestinationPath "PS3-Firmware-Extractor-Decrypter-v3.15-Windows-x64.zip" -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PS3-Firmware-Extractor-Decrypter-v3.15-Windows-x64
+          path: PS3-Firmware-Extractor-Decrypter-v3.15-Windows-x64.zip
+          if-no-files-found: error
+      - name: Publish GitHub release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create "${{ github.ref_name }}" "PS3-Firmware-Extractor-Decrypter-v3.15-Windows-x64.zip" --title "PS3 Firmware Extractor / Decrypter ${{ github.ref_name }}" --notes "Windows x64 standalone GUI build. External PS3Tools binaries and authorized cryptographic keys are NOT bundled. See README.md."
