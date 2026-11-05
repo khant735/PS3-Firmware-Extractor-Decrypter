@@ -8,6 +8,7 @@ import os
 import queue
 import shutil
 import subprocess
+import sys
 import re
 import tarfile
 import threading
@@ -16,7 +17,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 SUPPORTED = {".pup", ".pkg", ".spkg", ".self", ".tar", ".zip"}
 def elf_info(path):
     """Basic ELF header verification, including PowerPC/SPU machine and program header bounds."""
@@ -624,10 +625,13 @@ class App:
         v=filedialog.askdirectory() if kind=="dir" else filedialog.askopenfilename()
         if v:var.set(v)
     def launch_v34(self):
+        if getattr(sys, "frozen", False):
+            subprocess.Popen([sys.executable, "--firmware-v34"], cwd=str(BASE))
+            return
         script=BASE/"firmware_v34.py"
         if not script.is_file():
             messagebox.showerror("Missing module",str(script));return
-        subprocess.Popen([__import__("sys").executable,str(script)],cwd=str(BASE))
+        subprocess.Popen([sys.executable,str(script)],cwd=str(BASE))
 
     def audit_spkg_overlays(self):
         from tkinter import filedialog, messagebox
@@ -1121,6 +1125,10 @@ class App:
             self.emit("ERROR: "+str(e))
         finally:self.events.put("__DONE__")
 if __name__=="__main__":
+    if "--firmware-v34" in sys.argv:
+        from firmware_v34 import main as firmware_v34_main
+        firmware_v34_main()
+        sys.exit(0)
     root=tk.Tk()
     try:root.tk.call("tk","scaling",1.1)
     except tk.TclError:pass
