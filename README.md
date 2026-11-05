@@ -48,6 +48,95 @@ The repository contains **eight Windows batch launchers**. They are convenience 
 
 **Important:** The inventory scripts share report filenames. Running one dedicated scanner after the unified scan can **replace its corresponding JSON report**. Copy reports you want to compare before rerunning them. The batch files pause at the end so you can read console output. Existing extracted firmware input is required for all the audit/scan launchers; **only `START_WINDOWS.bat` opens the GUI for new extraction jobs**.
 
+## Cryptographic keys and `keysets.csv`
+
+The application uses **two separate key stores**. Keys are **not bundled** with this public repository. Supply only key material you are authorized to use.
+
+| Store | Used for | Required location |
+| --- | --- | --- |
+| **Package keys** | `unpkg.exe` decrypting SCE-wrapped `.pkg` / `.spkg` files, including supported CoreOS packages | `ps3keys/` containing binary `pkg-key-*` files |
+| **SELF executable keysets** | `unself.exe` converting supported SELF/SPRX files to ELF | `keysets.csv` in the project root; the GUI generates `self_keys/` automatically |
+
+The `PS3_KEYS` environment variable is set by the GUI to the appropriate directory when invoking these backends. **Package keys are not read from `keysets.csv`**, and the SELF key cache is not a substitute for `ps3keys/pkg-key-*`.
+
+### Key types and their roles
+
+- **AES ERK (`aes_erk`)**: AES key material used by the supported SELF backend.
+- **AES RIV (`aes_riv`)**: Initialization-vector material paired with the relevant keyset.
+- **ECDSA public key (`ecdsa_public`)**: Optional public-key material for operations supported by the backend, such as signature verification.
+- **ECDSA private key (`ecdsa_private`)**: Optional private-key material for signing-capable tooling; ordinary read-only scanning does not require it. The GUI's SELF exporter supports the field, but this does not make the GUI a signer.
+- **Curve type (`curve_type`)**: Optional elliptic-curve identifier exported as a four-byte big-endian value.
+- **Category (`category`)**: Key-family label; categories can represent executable classes such as `lv0`, `lv1`, `lv2`, or `app`. The backend determines which keyset is applicable.
+
+The precise required keys depend on the firmware generation, executable class, SCE metadata, and selected external backend. There is **no single universal keyset** that decrypts every PS3 firmware file. PUP unpacking, ELF inspection, signature scanning, FSELF/MSELF candidate detection, and ordinary ZIP/TAR extraction do **not** require a SELF key database.
+
+### Building `keysets.csv` from existing authorized keysets
+
+The v3.15 GUI reads the following **exact CSV column names**:
+
+```csv
+category,aes_erk,aes_riv,ecdsa_public,ecdsa_private,curve_type
+```
+
+1. In a text editor or spreadsheet, create a new UTF-8 CSV file named **`keysets.csv`** in the repository root, alongside `ps3_spkg_extractor_gui.py`.
+2. Add **one row per existing keyset**. Use a category label accepted by the PS3Tools backend. Supply each binary key or IV as a **plain hexadecimal string**, with no `0x` prefix or spaces. The `curve_type` field is also hexadecimal. Leave optional fields empty if they are unavailable.
+3. Save the file as **CSV UTF-8**, retaining the header exactly as shown. Do not place actual keys in GitHub issues, logs, screenshots or commits.
+4. Start `START_WINDOWS.bat`. Under **Key database CSV**, select the CSV file if it is not in the default location. When a SELF decryption workflow begins, the application exports the usable records to the private `self_keys/` directory.
+5. Verify that your chosen backend supports the keyset family and firmware being processed. A correctly formatted CSV **does not guarantee successful decryption**.
+
+The importer currently requires at least one usable key entry and does not independently validate key lengths, firmware-version compatibility, or cryptographic correctness. If the file is missing, the GUI reports **`SELF key database CSV is missing`**. If it contains no usable key files, it reports **`SELF key database contained no usable key entries`**.
+
+**Exact exporter mapping (v3.15):**
+
+| CSV field | Generated binary file | Encoding |
+| --- | --- | --- |
+| `category` + `aes_erk` | `<category>-key-000` | Hex decoded into raw bytes |
+| `category` + `aes_riv` | `<category>-iv-000` | Hex decoded into raw bytes |
+| `category` + `ecdsa_public` | `<category>-pub-000` | Hex decoded into raw bytes |
+| `category` + `ecdsa_private` | `<category>-priv-000` | Hex decoded into raw bytes |
+| `category` + `curve_type` | `<category>-ctype-000` | Four-byte big-endian integer |
+
+The `000` suffix represents the **zero-based CSV row index** and increments for subsequent records; it is not a firmware version. The GUI fingerprints `keysets.csv` using SHA-256 and reuses the generated cache when unchanged. If the database changes, it rebuilds the cache while preserving the old one if exporting fails.
+
+### Package key files: `ps3keys/pkg-key-*`
+
+For supported SCE-wrapped PKG/SPKG decryption, the source checks that **`tools/unpkg.exe`** exists and that **`ps3keys/`** contains at least one filename matching `pkg-key-*`. These files must be in the backend's expected **raw binary format**; do not rename a text CSV or paste hexadecimal text into them. Obtain the required compatible key files from your own authorized key collection or a source you have permission to use, and consult your exact `unpkg` backend's documentation for its expected package-key variants and naming.
+
+The current source does **not** provide a complete, authoritative firmware-by-firmware list of package keys, nor does it include a converter that automatically generates `ps3keys/pkg-key-*` from `keysets.csv`. Some custom-firmware packages may require keys different from those for retail firmware.
+
+### Example private directory layout
+
+```text
+PS3-Firmware-Extractor-Decrypter/
+├── keysets.csv             # user-supplied, private
+├── ps3keys/                # user-supplied package key files
+│   ├── pkg-key-000
+│   └── pkg-key-001
+├── self_keys/              # generated automatically from keysets.csv
+│   ├── app-key-000
+│   ├── app-iv-000
+│   └── ...
+└── tools/
+    ├── unself.exe
+    └── unpkg.exe
+```
+
+The names and entries above are illustrative; they are **not** a claim that these particular keys are sufficient for any given firmware.
+
+### Key-selection tracing and security
+
+When an **instrumented** PS3Tools backend emits `KEY_AUDIT_REQUEST` and `KEY_AUDIT_SELECTED` messages, the GUI records requested/selected **key identifiers** in its audit reports (including `successful_keys.json`). It does not deliberately log raw key bytes. An older, uninstrumented backend may report no selected key even when conversion succeeds. A reported metadata-header match alone does not prove that the entire executable decrypted correctly.
+
+The repository's `.gitignore` is intended to exclude `keysets.csv`, `ps3keys/`, `self_keys/` and generated firmware output. **Check your staged files before every public push**: a `.gitignore` does not protect files that were already committed or explicitly force-added. Do not publish private ECDSA signing keys or other secret material.
+
+### Reference implementations
+
+- [euss/ps3tools](https://github.com/euss/ps3tools) — backend utilities and binary key-file conventions.
+- [Sorvigolova/scetool](https://github.com/Sorvigolova/scetool) — SCE processing and alternative keyset conventions.
+- [RPCS3](https://github.com/RPCS3/rpcs3) — reference for PS3 executable formats and cryptographic handling.
+
+These projects are **references**, not guaranteed sources for every required key. Different backends can expect different formats, so their key databases are not necessarily directly interchangeable with this GUI's CSV schema.
+
 ## Formats and support levels
 
 | Format | Capability |
