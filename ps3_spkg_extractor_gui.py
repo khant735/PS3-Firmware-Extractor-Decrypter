@@ -796,6 +796,44 @@ class App:
             return keydir
         finally:
             if stage.exists():shutil.rmtree(stage)
+    def inspect_sce_templates(self, files, work, tools):
+        """Capture scetool -i output for original SCE containers; never modify inputs."""
+        backend=self.find_tool(tools,"scetool")
+        report={"schema_version":1,"tool":backend,"entries":[]}
+        if not backend:
+            self.emit("SCETool inspection skipped: scetool executable not found.")
+            return report
+        root=work/"package_metadata"/"scetool_info"
+        seen=set()
+        for source in files:
+            source=Path(source)
+            if not source.is_file() or source in seen:
+                continue
+            seen.add(source)
+            try:
+                with source.open("rb") as fp: magic=fp.read(4)
+                if magic!=b"SCE\\x00":
+                    continue
+                try:
+                    rel=source.relative_to(work)
+                except ValueError:
+                    rel=Path("input")/source.name
+                destination=root/rel.parent/(rel.name+".scetool-info.txt")
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                cmd=[backend,"-i",str(source)]
+                cp=subprocess.run(cmd,cwd=str(BASE),stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT,text=True,errors="replace",timeout=120)
+                destination.write_text(cp.stdout,encoding="utf-8")
+                row={"source":str(source),"report":str(destination.relative_to(work)),
+                     "status":"passed" if cp.returncode==0 else "failed",
+                     "exit_code":cp.returncode}
+                self.emit("SCETool info: %s | %s"%(source.name,row["status"]))
+            except Exception as exc:
+                row={"source":str(source),"status":"failed","error":str(exc)}
+                self.emit("SCETool info failed: %s: %s"%(source.name,exc))
+            report["entries"].append(row)
+        return report
+
     def decrypt_self_files(self,files,work,tools,db,key_audit=None):
         backend=self.find_tool(tools,"unself")
         if not backend:
@@ -811,7 +849,7 @@ class App:
             # Keep decrypted executables separate from the extracted source files.
             # Preserve nested source paths to prevent same-name collisions.
             rel_source=item.relative_to(work)
-            target=work/"ELF"/rel_source.with_suffix(".elf")
+            target=work/("PRX" if item.suffix.lower()==".sprx" else "ELF")/rel_source.with_suffix(".prx" if item.suffix.lower()==".sprx" else ".elf")
             target.parent.mkdir(parents=True,exist_ok=True)
             # Never accept an ELF left over from an earlier attempt.
             if target.exists(): target.unlink()
@@ -909,7 +947,7 @@ class App:
             ext=p.suffix.lower()
             auto_requested=(mode=="Auto")
             if mode=="Auto":
-                mode={".pup":"PUP unpack",".self":"SELF to ELF",".tar":"TAR unpack",".zip":"ZIP unpack",".spkg":"SPKG external extractor"}.get(ext,"Inspect only")
+                mode={".pup":"PUP unpack",".self":"SELF to ELF",".sprx":"SELF to ELF",".tar":"TAR unpack",".zip":"ZIP unpack",".spkg":"SPKG external extractor"}.get(ext,"Inspect only")
                 if ext==".pkg" and p.name.upper()=="CORE_OS_PACKAGE.PKG":mode="CORE_OS package unpack"
                 if ext==".tar" and p.name.lower()=="update_files.tar":mode="Batch firmware decrypt + full extract"
                 elif ext==".pkg":self.emit("Unknown PKG type: select a compatible operation explicitly.")
@@ -1093,6 +1131,14 @@ class App:
                 # v3.15: one memory-mapped walk produces all three inventories.
                 from firmware_format_scan import scan as scan_firmware_formats
                 scan_firmware_formats(work,self.emit)
+            # Inspect signed originals, not decrypted ELF/PRX output. Report failures
+            # without blocking decryption or extraction.
+            sce_candidates=[original_input]
+            if work.is_dir():
+                sce_candidates.extend(work/r['path'] for r in discover_executable_files(work)
+                                      if r['kind']=='sce')
+            sce_report=self.inspect_sce_templates(sce_candidates,work,tools)
+            (work/"scetool_info_report.json").write_text(json.dumps(sce_report,indent=2),encoding="utf-8")
             if summary is not None:
                 (work/"self_decryption_results.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
             (work/"successful_keys.json").write_text(json.dumps({
