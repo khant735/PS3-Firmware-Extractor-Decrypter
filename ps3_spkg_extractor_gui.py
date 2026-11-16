@@ -812,7 +812,7 @@ class App:
             seen.add(source)
             try:
                 with source.open("rb") as fp: magic=fp.read(4)
-                if magic!=b"SCE\\x00":
+                if magic!=b"SCE\x00":
                     continue
                 try:
                     rel=source.relative_to(work)
