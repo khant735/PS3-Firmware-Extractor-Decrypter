@@ -20,11 +20,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 BASE = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 SUPPORTED = {".pup", ".pkg", ".spkg", ".self", ".tar", ".zip"}
 def write_folder_file_lists(root):
-    """Write files.txt in each populated extraction directory, including its descendants.
-
-    Inventories use relative paths and exclude generated files.txt entries so repeated
-    runs remain stable. Symlink directories are not traversed.
-    """
+    """Write sorted relative filenames and byte sizes into each folder's files.txt."""
     root = Path(root)
     if not root.is_dir() or root.is_symlink():
         return (0, 0)
@@ -37,7 +33,7 @@ def write_folder_file_lists(root):
     folders.insert(0, root)
     written = 0
     for folder in folders:
-        paths = []
+        entries = []
         for directory, subdirs, filenames in os.walk(folder, topdown=True, followlinks=False):
             base = Path(directory)
             subdirs[:] = sorted(d for d in subdirs if not (base / d).is_symlink())
@@ -45,21 +41,27 @@ def write_folder_file_lists(root):
                 file_path = base / name
                 if name.lower() == 'files.txt' or file_path.is_symlink():
                     continue
-                paths.append(file_path.relative_to(folder).as_posix())
-        paths.sort(key=lambda name: (name.casefold(), name))
-        if not paths:
+                entries.append((file_path.relative_to(folder).as_posix(), file_path.stat().st_size))
+        entries.sort(key=lambda item: (item[0].casefold(), item[0]))
+        if not entries:
             continue
+        name_width = max(8, *(len(name) for name, _ in entries))
+        size_width = max(12, *(len(f'{size:,}') for _, size in entries))
+        header = f"{'Filename':<{name_width}}  {'Size (bytes)':>{size_width}}"
+        lines = [header, '-' * len(header)]
+        lines.extend(f"{name:<{name_width}}  {size:>{size_width},}" for name, size in entries)
         destination = folder / 'files.txt'
         temporary = folder / '.files.txt.tmp'
         try:
-            with temporary.open('w', encoding='utf-8', newline='\\n') as stream:
-                stream.write('\\n'.join(paths) + '\\n')
+            with temporary.open('w', encoding='utf-8', newline='\n') as stream:
+                stream.write('\n'.join(lines) + '\n')
             temporary.replace(destination)
             written += 1
         finally:
             if temporary.exists():
                 temporary.unlink()
     return (written, len(folders))
+
 
 def elf_info(path):
     """Basic ELF header verification, including PowerPC/SPU machine and program header bounds."""
