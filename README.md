@@ -23,6 +23,26 @@ START_WINDOWS.bat
 
 Or `py -3 ps3_spkg_extractor_gui.py`. The launcher starts the Python GUI directly; no Python-to-EXE compilation is required. Keep the other `.py` modules beside the main script. Supply compatible external binaries under `tools/` before using extraction/decryption features.
 
+## Automatic folder file lists
+
+After an extraction or inspection operation completes, the GUI generates a plain-text `files.txt` within every populated output directory, including the top-level output directory. Each list contains sorted, relative file paths under that directory (including nested files), one path per line. This makes it easy to identify extracted PUP, CORE_OS, SPKG, TAR, ZIP, SELF and ELF outputs without opening the JSON or CSV reports.
+
+The inventories are created after the existing extraction/audit reports, so they do not affect extraction or verification. A directory with no files beneath it gets no listing. Existing `files.txt` names and symlinks are excluded from the inventory; symlink directories are not traversed. File-list write failures produce a warning in the GUI log instead of invalidating a successful extraction.
+
+Example:
+
+```text
+CORE_OS_PACKAGE/
+  files.txt
+  ELF/
+    files.txt
+    lv2_kernel.elf
+  dev_flash_extracted/
+    files.txt
+    vsh/
+      files.txt
+```
+
 ## Using the GUI
 
 1. Start `START_WINDOWS.bat` and select an input file and operation in the GUI.
