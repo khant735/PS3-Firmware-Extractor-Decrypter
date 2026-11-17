@@ -20,28 +20,22 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 BASE = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 SUPPORTED = {".pup", ".pkg", ".spkg", ".self", ".tar", ".zip"}
 def write_folder_file_lists(root):
-    """Write sorted relative filenames and byte sizes into each folder's files.txt."""
+    """Write each folder's direct files and byte sizes, never subfolder contents."""
     root = Path(root)
     if not root.is_dir() or root.is_symlink():
         return (0, 0)
-    folders = []
-    for directory, subdirs, filenames in os.walk(root, topdown=True, followlinks=False):
-        base = Path(directory)
-        subdirs[:] = sorted(d for d in subdirs if not (base / d).is_symlink())
-        if base != root and (filenames or subdirs):
-            folders.append(base)
-    folders.insert(0, root)
     written = 0
-    for folder in folders:
+    visited = 0
+    for directory, subdirs, filenames in os.walk(root, topdown=True, followlinks=False):
+        folder = Path(directory)
+        subdirs[:] = sorted(d for d in subdirs if not (folder / d).is_symlink())
+        visited += 1
         entries = []
-        for directory, subdirs, filenames in os.walk(folder, topdown=True, followlinks=False):
-            base = Path(directory)
-            subdirs[:] = sorted(d for d in subdirs if not (base / d).is_symlink())
-            for name in filenames:
-                file_path = base / name
-                if name.lower() == 'files.txt' or file_path.is_symlink():
-                    continue
-                entries.append((file_path.relative_to(folder).as_posix(), file_path.stat().st_size))
+        for name in filenames:
+            path = folder / name
+            if name.lower() == 'files.txt' or path.is_symlink():
+                continue
+            entries.append((name, path.stat().st_size))
         entries.sort(key=lambda item: (item[0].casefold(), item[0]))
         if not entries:
             continue
@@ -60,7 +54,7 @@ def write_folder_file_lists(root):
         finally:
             if temporary.exists():
                 temporary.unlink()
-    return (written, len(folders))
+    return (written, visited)
 
 
 def elf_info(path):
