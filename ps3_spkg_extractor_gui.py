@@ -19,6 +19,48 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 
 BASE = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent
 SUPPORTED = {".pup", ".pkg", ".spkg", ".self", ".tar", ".zip"}
+def write_folder_file_lists(root):
+    """Write files.txt in each populated extraction directory, including its descendants.
+
+    Inventories use relative paths and exclude generated files.txt entries so repeated
+    runs remain stable. Symlink directories are not traversed.
+    """
+    root = Path(root)
+    if not root.is_dir() or root.is_symlink():
+        return (0, 0)
+    folders = []
+    for directory, subdirs, filenames in os.walk(root, topdown=True, followlinks=False):
+        base = Path(directory)
+        subdirs[:] = sorted(d for d in subdirs if not (base / d).is_symlink())
+        if base != root and (filenames or subdirs):
+            folders.append(base)
+    folders.insert(0, root)
+    written = 0
+    for folder in folders:
+        paths = []
+        for directory, subdirs, filenames in os.walk(folder, topdown=True, followlinks=False):
+            base = Path(directory)
+            subdirs[:] = sorted(d for d in subdirs if not (base / d).is_symlink())
+            for name in filenames:
+                file_path = base / name
+                if name.lower() == 'files.txt' or file_path.is_symlink():
+                    continue
+                paths.append(file_path.relative_to(folder).as_posix())
+        paths.sort(key=lambda name: (name.casefold(), name))
+        if not paths:
+            continue
+        destination = folder / 'files.txt'
+        temporary = folder / '.files.txt.tmp'
+        try:
+            with temporary.open('w', encoding='utf-8', newline='\\n') as stream:
+                stream.write('\\n'.join(paths) + '\\n')
+            temporary.replace(destination)
+            written += 1
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+    return (written, len(folders))
+
 def elf_info(path):
     """Basic ELF header verification, including PowerPC/SPU machine and program header bounds."""
     with open(path, "rb") as f:
@@ -1155,6 +1197,11 @@ class App:
             self.emit(f"Results report: {len(rows)} entries; JSON and CSV saved in output folder")
             manifest={"input":str(original_input),"sha256":sha256(original_input),"detected":sniff(original_input),"operation":mode,"timestamp":time.strftime("%Y-%m-%dT%H:%M:%S"),"output":str(work),"backend":"unpkg -s -> cosunpkg" if mode=="CORE_OS package unpack" else None}
             (work/"extraction_manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
+            try:
+                inventory_count, folder_count = write_folder_file_lists(work)
+                self.emit(f"Folder inventories: {inventory_count} files.txt created in {folder_count} folders")
+            except OSError as inventory_error:
+                self.emit("WARNING: unable to create some folder inventories: " + str(inventory_error))
             if mode in ("Inspect only","SPKG header catalogue","Batch firmware inspect"): self.emit("INSPECTION COMPLETE (no extraction): "+str(work))
             elif mode in ("Batch firmware decrypt","Batch firmware decrypt + TAR extract","Batch firmware decrypt + full extract"): self.emit("BATCH COMPLETE (per-file statuses in firmware_batch_report.json): "+str(work))
             elif summary and summary["failed"]:
